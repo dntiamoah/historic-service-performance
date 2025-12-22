@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: service-performance
+  datasource:
+    url: jdbc:postgresql://localhost:5434/wayfare
+    username: postgres
+    password: admin
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    database: postgresql
+    hibernate:
+      ddl-auto: update
+      naming:
+        implicit-strategy: org.hibernate.boot.model.naming.ImplicitNamingStrategyJpaCompliantImpl
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  logging:
+    level:
+      com.nafifsource.commute.nrefeed.etl: ERROR
+      org.springframework.data.jpa: ERROR
+      org.springframework.batch: DEBUG
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: always
+  flyway:
+    check-location: false
+hsp:
+  threadCount: 2
+  url: https://hsp-prod.rockshore.net/api/v1/
+  usr: ntiamoahd@btinternet.com
+  pwd: skf@FVW@v7rkkGt
+  schedule:
+    pull: 0 */1 * * * *
+    load: 0 */10 * * * *
+    date: 20251221

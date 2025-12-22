@@ -5,6 +5,7 @@ import com.nafifsource.hsp.service_performance.domain.DailyPerformanceServiceRID
 import com.nafifsource.hsp.service_performance.domain.DaysRunEnum;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.core.job.Job;
 import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.job.parameters.RunIdIncrementer;
@@ -17,6 +18,7 @@ import org.springframework.batch.infrastructure.item.database.JdbcPagingItemRead
 import org.springframework.batch.infrastructure.item.database.PagingQueryProvider;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcPagingItemReaderBuilder;
 import org.springframework.batch.infrastructure.item.database.support.SqlPagingQueryProviderFactoryBean;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -41,9 +43,11 @@ public class HistoricServicePerformanceBatchConfig {
     }
 
     @Bean
+    @StepScope
     public JdbcPagingItemReader<DailyPerformanceServiceRID> itemReader(DataSource dataSource,
-                                                                       PagingQueryProvider queryProvider) throws Exception {
-        final LocalDate yesterday = LocalDate.now().minusDays(1);
+                                                                       PagingQueryProvider queryProvider,
+                                                                       @Value("#{jobParameters['theDate']}") String theDate) throws Exception {
+        final LocalDate yesterday = LocalDate.parse(theDate);
         Map<String, Object> parameterValues = new HashMap<>();
         final String daysRun = DaysRunEnum.valueOf(yesterday.getDayOfWeek().name()).getLabel();
         parameterValues.put("daysRun", daysRun);
@@ -91,12 +95,11 @@ public class HistoricServicePerformanceBatchConfig {
     @Bean
     public Step hspBasicScheduleStep(JobRepository jobRepository,
                                      PlatformTransactionManager transactionManager,
-                                     DataSource dataSource,
-                                     PagingQueryProvider queryProvider) throws Exception {
+                                     JdbcPagingItemReader<DailyPerformanceServiceRID> itemReader) {
         return new StepBuilder("hspBasicScheduleStep", jobRepository)
                 .<DailyPerformanceServiceRID, BasicScheduleDailyPerformance>chunk(20)
                 .transactionManager(transactionManager)
-                .reader(itemReader(dataSource, queryProvider))
+                .reader(itemReader)
                 .processor(hspProcessor())
                 .writer(hspWriter())
                 .build();
@@ -105,11 +108,10 @@ public class HistoricServicePerformanceBatchConfig {
     @Bean
     public Job hspBasicScheduleJob(JobRepository jobRepository,
                                    PlatformTransactionManager transactionManager,
-                                   DataSource dataSource,
-                                   PagingQueryProvider queryProvider) throws Exception {
+                                   JdbcPagingItemReader<DailyPerformanceServiceRID> itemReader) {
         return new JobBuilder("hspBasicScheduleJob", jobRepository)
                 .incrementer(new RunIdIncrementer())
-                .start(hspBasicScheduleStep(jobRepository, transactionManager, dataSource, queryProvider))
+                .start(hspBasicScheduleStep(jobRepository, transactionManager, itemReader))
                 .build();
     }
 }
