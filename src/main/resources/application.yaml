@@ -28,12 +28,22 @@ spring:
       initialize-schema: always
   flyway:
     check-location: false
+
+  docker:
+    compose:
+      enabled=false:
+
 hsp:
   threadCount: 2
   url: https://hsp-prod.rockshore.net/api/v1/
   usr: ntiamoahd@btinternet.com
   pwd: skf@FVW@v7rkkGt
+  theDate: 19680410
   schedule:
-    pull: 0 */1 * * * *
-    load: 0 */10 * * * *
+    minute: 0 */1 * * * *
+    tenMin: 0 */10 * * * *
+    daily: 0 1 1 * * *
     date: 20251221
+    skipped: 0
+
+

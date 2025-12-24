@@ -6,32 +6,35 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
-import lombok.experimental.SuperBuilder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Table(name = "HistoricServicePerformanceLog",
         indexes = {
-                @Index(name = "hsp_date_index", columnList = "historicServicePerformanceDate"),
+                @Index(name = "hsp_start_date_index", columnList = "collectionStartDate"),
+                @Index(name = "hsp_end_date_index", columnList = "collectionEndDate"),
         })
 @Entity
 @Getter
 @Setter
-@SuperBuilder
+@Builder
+@NoArgsConstructor
 @AllArgsConstructor
 public class HistoricServicePerformanceLog {
 
     @Id
-    private final LocalDate historicServicePerformanceDate;
-    private final LocalDateTime collectionStartDate;
-    private final LocalDateTime collectionEndDate;
-    private final Integer totalRows;
-    private final Integer processedRows;
-    private final Integer skippedRows;
-    private final Integer errorRows;
-    private final boolean isComplete;
+    private LocalDate historicServicePerformanceDate;
+    private LocalDateTime collectionStartDate;
+    private LocalDateTime collectionEndDate;
+    private Integer totalRows;
+    private Integer processedRows;
+    private Integer skippedRows;
+    private Integer errorRows;
+    private boolean isComplete;
 
 }

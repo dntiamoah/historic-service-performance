@@ -8,7 +8,6 @@ import com.nafifsource.hsp.service_performance.domain.dao.BasicScheduleDailyPerf
 import com.nafifsource.hsp.service_performance.domain.dao.BasicScheduleLocationDailyPerformanceDAO;
 import org.springframework.batch.infrastructure.item.Chunk;
 import org.springframework.batch.infrastructure.item.ItemWriter;
-import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -23,21 +22,23 @@ public class HistoricServicePerformanceJpaWriter implements ItemWriter<BasicSche
     }
 
     @Override
-    public void write(@NonNull Chunk<? extends BasicScheduleDailyPerformance> chunk) throws Exception {
+    public void write(Chunk<? extends BasicScheduleDailyPerformance> chunk) {
 
         for (BasicScheduleDailyPerformance item : chunk) {
-            // order locations by published time of arrival ascending to get order correct
+            //  locations order is maintained by arrayList OTB
             basicDailyScheduleDAO.save(
                     BasicScheduleDailyPerformanceHeader.builder()
                             .dateOfService(item.getDateOfService())
                             .rid(item.getRid())
                             .tocCode(item.getTocCode())
                             .originCrs(item.getLocations().stream()
+                                    // First location for service originating calling point
                                     .findFirst()
                                     .map(BasicScheduleLocationDailyPerformance::getId)
                                     .map(BasicScheduleLocationDailyPerformanceId::getLocation)
                                     .orElse(null))
                             .terminateCrs(item.getLocations().stream()
+                                    // Last location for service termination calling point - I love this :)
                                     .reduce((first, second) -> second)
                                     .map(BasicScheduleLocationDailyPerformance::getId)
                                     .map(BasicScheduleLocationDailyPerformanceId::getLocation)
@@ -45,7 +46,5 @@ public class HistoricServicePerformanceJpaWriter implements ItemWriter<BasicSche
                             .build());
             locationDailyPerformanceDAO.saveAll(item.getLocations());
         }
-
-
     }
 }

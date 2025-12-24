@@ -4,9 +4,9 @@ import com.nafifsource.hsp.service_performance.domain.BasicScheduleDailyPerforma
 import com.nafifsource.hsp.service_performance.domain.BasicScheduleLocationDailyPerformance;
 import com.nafifsource.hsp.service_performance.domain.BasicScheduleLocationDailyPerformanceId;
 import com.nafifsource.hsp.service_performance.domain.DailyPerformanceServiceRID;
-import com.nafifsource.hsp.service_performance.dto.ServiceAttributesDetailDTO;
 import com.nafifsource.hsp.service_performance.dto.ServiceAttributesDetailsResponseDTO;
 import com.nafifsource.hsp.service_performance.dto.ServiceDetailsRequestDTO;
+import com.nafifsource.hsp.service_performance.exception.HistoricServicePerformanceMapException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.infrastructure.item.ItemProcessor;
@@ -31,13 +31,11 @@ public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyP
     }
 
     @Override
-    public BasicScheduleDailyPerformance process(DailyPerformanceServiceRID item) throws Exception {
+    public BasicScheduleDailyPerformance process(DailyPerformanceServiceRID item) {
         // use item to get serviceAttributesDetails with https://hsp-prod.rockshore.net/api/v1/serviceDetails
         ServiceDetailsRequestDTO reqRID = ServiceDetailsRequestDTO.builder()
                 .rid(item.getRid())
                 .build();
-        LOGGER.info("Get ServiceMetrics from hsp-prod for rid: {}", Optional.ofNullable(reqRID.getRid()).orElse("Oops"));
-
         try {
             ServiceAttributesDetailsResponseDTO serviceAttributesDetails =
                     webClient.post()
@@ -48,9 +46,6 @@ public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyP
                             .onErrorMap(WebClientResponseException.class, ex ->
                                     new IllegalArgumentException("Something went wrong with your request. error message: " + ex.getMessage()))
                             .block();
-            LOGGER.info("Got ServiceMetrics from hsp-prod ok rid: {}", Optional.ofNullable(serviceAttributesDetails)
-                    .map(ServiceAttributesDetailsResponseDTO::getServiceAttributesDetailDTO)
-                    .map(ServiceAttributesDetailDTO::getRid));
             AtomicInteger counter = new AtomicInteger(0);
             return Optional.ofNullable(serviceAttributesDetails)
                     .map(ServiceAttributesDetailsResponseDTO::getServiceAttributesDetailDTO)
@@ -69,16 +64,25 @@ public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyP
                                                     .publishedTimeOfArrival(location.getPublished_gbtt_pta())
                                                     .actualTimeOfArrival(location.getActual_ta())
                                                     .publishedTimeOfDeparture(location.getPublished_gbtt_ptd())
+                                                    .dateOfService(LocalDate.parse(sad.getDateOfService()))
                                                     .actualTimeOfDeparture(location.getActual_td())
                                                     .lateCancellationReason(location.getLateCancelReason())
                                                     .callingPointOrder(counter.getAndIncrement())
                                                     .build()
                                             ).collect(Collectors.toList()))
                                     .build())
-                    .orElse(null);
+                    .orElseThrow(() -> new HistoricServicePerformanceMapException("Response mapping error for HSP-PROD API - RID: " + item.getRid()));
+        } catch (HistoricServicePerformanceMapException e) {
+            LOGGER.error("Error HistoricServicePerformanceMapException - {}", e.getLocalizedMessage());
         } catch (RuntimeException e) {
-            LOGGER.error("Skipping serviceDetails with this rid: {} due to the following error: {}", item.getRid(), e.getLocalizedMessage());
-            return null;
+            String dateOfService = item.getRid().substring(1, 8);
+            LOGGER.error("Skipping HistoricServicePerformance dateOfService: {}, trainuid: {},  rid: {} due to the following error: {}",
+                    dateOfService,
+                    item.getTrainUid(),
+                    item.getRid(),
+                    e.getLocalizedMessage());
         }
+        // log the error and return null so writer does not break
+        return null;
     }
 }

@@ -10,10 +10,12 @@ import lombok.NoArgsConstructor;
 import lombok.experimental.SuperBuilder;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 
 @Table(name = "BasicScheduleLocationDailyPerformance",
         indexes = {
                 @Index(name = "hsp_lateCancelReason", columnList = "lateCancellationReason"),
+                @Index(name = "hsp_dateOfService", columnList = "dateOfService"),
         })
 @Entity
 @Getter
@@ -24,6 +26,7 @@ public class BasicScheduleLocationDailyPerformance implements Serializable {
 
     @EmbeddedId
     private BasicScheduleLocationDailyPerformanceId id;
+    private LocalDate dateOfService;
     private String publishedTimeOfDeparture;
     private String publishedTimeOfArrival;
     private String actualTimeOfDeparture;

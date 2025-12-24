@@ -1,5 +1,7 @@
 package com.nafifsource.hsp.service_performance.batch;
 
+import com.nafifsource.hsp.service_performance.domain.HistoricServicePerformanceLog;
+import com.nafifsource.hsp.service_performance.domain.dao.HistoricServicePerformanceLogDAO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.batch.core.job.Job;
@@ -15,23 +17,31 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import static java.util.UUID.randomUUID;
 
 @Service
 public class HistoricServicePerformanceLauncher {
 
-    private final Job hspBasicScheduleJob;
+    private final Job collectAllHistoricServicePerformance;
     private final JobOperator jobOperator;
     private final JdbcTemplate jdbcTemplate;
+    private final HistoricServicePerformanceLogDAO hspLogDAO;
+    private final HistoricServicePerformanceConfig config;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(HistoricServicePerformanceLauncher.class);
 
 
-    public HistoricServicePerformanceLauncher(Job hspBasicScheduleJob, JobOperator jobOperator, JdbcTemplate jdbcTemplate) {
-        this.hspBasicScheduleJob = hspBasicScheduleJob;
+    public HistoricServicePerformanceLauncher(Job collectAllHistoricServicePerformance,
+                                              JobOperator jobOperator,
+                                              JdbcTemplate jdbcTemplate,
+                                              HistoricServicePerformanceLogDAO hspLogDAO, HistoricServicePerformanceConfig config) {
+        this.collectAllHistoricServicePerformance = collectAllHistoricServicePerformance;
         this.jobOperator = jobOperator;
         this.jdbcTemplate = jdbcTemplate;
+        this.hspLogDAO = hspLogDAO;
+        this.config = config;
     }
 
 //    * "0 0 * * * *" = the top of every hour of every day.
@@ -42,8 +52,8 @@ public class HistoricServicePerformanceLauncher {
 //    * "0 0 9-17 * * MON-FRI" = on the hour nine-to-five weekdays
 //    * "0 0 0 25 12 ?" = every Christmas Day at midnight
 
-    @Scheduled(cron = "0 0 22 * * *")
-    void loadAllAvailableHistoricServicePerformanceData(LocalDate theDate) throws JobInstanceAlreadyCompleteException,
+    @Scheduled(cron = "${hsp.schedule.minute}")
+    void loadAllAvailableHistoricServicePerformanceData() throws JobInstanceAlreadyCompleteException,
             JobExecutionAlreadyRunningException,
             JobRestartException,
             InvalidJobParametersException {
@@ -56,13 +66,21 @@ public class HistoricServicePerformanceLauncher {
         LOGGER.info("HSP Daily Basic Schedule - Start from: {} to {}", yesterday, minDate);
 
         for (LocalDate date = yesterday; !date.isBefore(minDate); date = date.minusDays(1)) {
-            JobParameters hspParameters = new JobParametersBuilder()
-                    .addString("hspDataLoadJob-runId", randomUUID().toString(), true)
-                    .addString("theDate", theDate.toString(), true)
+            HistoricServicePerformanceLog.HistoricServicePerformanceLogBuilder hspLog = HistoricServicePerformanceLog.builder();
+            hspLog.historicServicePerformanceDate(date)
+                    .collectionStartDate(LocalDateTime.now())
+                    .isComplete(false);
+            config.setTheDate(date.toString());
+            JobParameters jobParameters = new JobParametersBuilder()
+                    .addString("collectAllHistoricServicePerformanceRunId", randomUUID().toString(), true)
+                    .addString("theDate", date.toString(), true)
                     .toJobParameters();
-            jobOperator.start(hspBasicScheduleJob, hspParameters);
+            jobOperator.start(collectAllHistoricServicePerformance, jobParameters);
 
-            jdbcTemplate.update("INSERT INTO hspcollectionlog (processed_date) VALUES (?)", date);
+            hspLog.collectionEndDate(LocalDateTime.now())
+                    .isComplete(true);
+            LOGGER.info("HSP Daily Basic Schedule - Finish: {}", yesterday);
+            hspLogDAO.save(hspLog.build());
         }
         LOGGER.info("HSP Daily Basic Schedule ingested: ");
     }

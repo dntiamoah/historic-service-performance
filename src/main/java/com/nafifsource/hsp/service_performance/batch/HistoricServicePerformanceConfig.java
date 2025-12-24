@@ -27,6 +27,7 @@ public class HistoricServicePerformanceConfig {
     private String url;
     private String usr;
     private String pwd;
+    private String theDate;
 
     @Bean("webClientRockShore")
     public WebClient webclient() {
