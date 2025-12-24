@@ -63,7 +63,7 @@ public class HistoricServicePerformanceLauncher {
         LocalDate minDate = jdbcTemplate.queryForObject(
                 "SELECT MIN(date_runs_from) FROM mca_basic_schedule", LocalDate.class);
 
-        LOGGER.info("HSP Daily Basic Schedule - Start from: {} to {}", yesterday, minDate);
+        LOGGER.info("HSP Daily Basic Schedule - Starting from: {} to {}", yesterday, minDate);
 
         for (LocalDate date = yesterday; !date.isBefore(minDate); date = date.minusDays(1)) {
             HistoricServicePerformanceLog.HistoricServicePerformanceLogBuilder hspLog = HistoricServicePerformanceLog.builder();
@@ -82,6 +82,6 @@ public class HistoricServicePerformanceLauncher {
             LOGGER.info("HSP Daily Basic Schedule - Finish: {}", yesterday);
             hspLogDAO.save(hspLog.build());
         }
-        LOGGER.info("HSP Daily Basic Schedule ingested: ");
+        LOGGER.info("HSP Daily Basic Schedule ingested all from: {} to {}", yesterday, minDate);
     }
 }
