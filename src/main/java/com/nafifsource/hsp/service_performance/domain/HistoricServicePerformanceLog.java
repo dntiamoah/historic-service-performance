@@ -31,10 +31,8 @@ public class HistoricServicePerformanceLog {
     private LocalDate historicServicePerformanceDate;
     private LocalDateTime collectionStartDate;
     private LocalDateTime collectionEndDate;
-    private Integer totalRows;
-    private Integer processedRows;
-    private Integer skippedRows;
-    private Integer errorRows;
+    private Integer recordCount;
+    private Integer errorRecords;
     private boolean isComplete;
 
 }

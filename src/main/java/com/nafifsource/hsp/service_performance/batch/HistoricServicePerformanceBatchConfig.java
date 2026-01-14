@@ -80,7 +80,31 @@ public class HistoricServicePerformanceBatchConfig {
                 "AND train_status in ('1', 'P') ");
         provider.setSortKey("trainuid");
 
-        LOGGER.info("HistoricServicePerformance queryProvider set");
+        LOGGER.info("HistoricServicePerformance queryProvider for: {}", config.getTheDate());
+        return provider.getObject();
+    }
+
+    @Bean
+    @StepScope
+    public PagingQueryProvider retryQueryProvider(DataSource dataSource) throws Exception {
+        SqlPagingQueryProviderFactoryBean provider = new SqlPagingQueryProviderFactoryBean();
+
+        provider.setDataSource(dataSource);
+        provider.setSelectClause("SELECT " +
+                "rid, " +
+                "trainuid, " +
+                "dateOfService, " +
+                "errorMessage, " +
+                "httpStatus, " +
+                "retries, " +
+                "errorTimeStamp, " +
+                "lastRetry, " +
+                "isSuccessful ");
+        provider.setFromClause("FROM HistoricServicePerformanceErrorResponse ");
+        provider.setWhereClause("isSuccessful IS FALSE");
+        provider.setSortKey("rid");
+
+        LOGGER.info("HistoricServicePerformanceErrorResponse queryProvider for: {}", config.getTheDate());
         return provider.getObject();
     }
 
@@ -101,7 +125,7 @@ public class HistoricServicePerformanceBatchConfig {
                                      PlatformTransactionManager transactionManager,
                                      JdbcPagingItemReader<DailyPerformanceServiceRID> hspItemReader) {
         return new StepBuilder("hspBasicScheduleStep", jobRepository)
-                .<DailyPerformanceServiceRID, BasicScheduleDailyPerformance>chunk(20)
+                .<DailyPerformanceServiceRID, BasicScheduleDailyPerformance>chunk(200)
                 .transactionManager(transactionManager)
                 .reader(hspItemReader)
                 .processor(hspProcessor())

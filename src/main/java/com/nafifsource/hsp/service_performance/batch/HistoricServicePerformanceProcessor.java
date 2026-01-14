@@ -4,6 +4,8 @@ import com.nafifsource.hsp.service_performance.domain.BasicScheduleDailyPerforma
 import com.nafifsource.hsp.service_performance.domain.BasicScheduleLocationDailyPerformance;
 import com.nafifsource.hsp.service_performance.domain.BasicScheduleLocationDailyPerformanceId;
 import com.nafifsource.hsp.service_performance.domain.DailyPerformanceServiceRID;
+import com.nafifsource.hsp.service_performance.domain.HistoricServicePerformanceErrorResponse;
+import com.nafifsource.hsp.service_performance.domain.dao.HistoricServicePerformanceErrorResponseDAO;
 import com.nafifsource.hsp.service_performance.dto.ServiceAttributesDetailsResponseDTO;
 import com.nafifsource.hsp.service_performance.dto.ServiceDetailsRequestDTO;
 import com.nafifsource.hsp.service_performance.exception.HistoricServicePerformanceMapException;
@@ -16,6 +18,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
@@ -24,10 +27,15 @@ import java.util.stream.Collectors;
 public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyPerformanceServiceRID, BasicScheduleDailyPerformance> {
 
     private final WebClient webClient;
+    private final HistoricServicePerformanceErrorResponseDAO errorRequestsDAO;
+    private final HistoricServicePerformanceConfig config;
     private static final Logger LOGGER = LoggerFactory.getLogger(HistoricServicePerformanceProcessor.class);
 
-    public HistoricServicePerformanceProcessor(@Qualifier("webClientRockShore") WebClient webClient) {
+
+    public HistoricServicePerformanceProcessor(@Qualifier("webClientRockShore") WebClient webClient, HistoricServicePerformanceErrorResponseDAO errorRequestsDAO, HistoricServicePerformanceConfig config) {
         this.webClient = webClient;
+        this.errorRequestsDAO = errorRequestsDAO;
+        this.config = config;
     }
 
     @Override
@@ -36,6 +44,7 @@ public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyP
         ServiceDetailsRequestDTO reqRID = ServiceDetailsRequestDTO.builder()
                 .rid(item.getRid())
                 .build();
+        config.setRecordCount(config.getRecordCount() + 1);
         try {
             ServiceAttributesDetailsResponseDTO serviceAttributesDetails =
                     webClient.post()
@@ -44,7 +53,7 @@ public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyP
                             .retrieve()
                             .bodyToMono(ServiceAttributesDetailsResponseDTO.class)
                             .onErrorMap(WebClientResponseException.class, ex ->
-                                    new IllegalArgumentException("Something went wrong with your request. error message: " + ex.getMessage()))
+                                    handleWebClientResponseException(ex, item))
                             .block();
             AtomicInteger counter = new AtomicInteger(0);
             return Optional.ofNullable(serviceAttributesDetails)
@@ -75,14 +84,29 @@ public class HistoricServicePerformanceProcessor implements ItemProcessor<DailyP
         } catch (HistoricServicePerformanceMapException e) {
             LOGGER.error("Error HistoricServicePerformanceMapException - {}", e.getLocalizedMessage());
         } catch (RuntimeException e) {
-            String dateOfService = item.getRid().substring(1, 8);
-            LOGGER.error("Skipping HistoricServicePerformance dateOfService: {}, trainuid: {},  rid: {} due to the following error: {}",
-                    dateOfService,
-                    item.getTrainUid(),
+            LOGGER.error("Skipping HistoricServicePerformance recordCount: {}, errorCount: {},  rid: {} due to the following error: {}",
+                    config.getRecordCount(),
+                    config.getErrorCount(),
                     item.getRid(),
                     e.getLocalizedMessage());
+            config.setErrorCount(config.getErrorCount() + 1);
         }
         // log the error and return null so writer does not break
         return null;
+    }
+
+    private RuntimeException handleWebClientResponseException(WebClientResponseException ex, DailyPerformanceServiceRID item) {
+
+        errorRequestsDAO.save(HistoricServicePerformanceErrorResponse.builder()
+                .rid(item.getRid())
+                .trainuid(item.getTrainUid())
+                .httpStatus(ex.getStatusCode().toString())
+                .errorTimeStamp(LocalDateTime.now())
+                .dateOfService(item.getRid().substring(0, 8))
+                .errorMessage(ex.getLocalizedMessage())
+                .retries(0)
+                .isSuccessful(false)
+                .build());
+        return new IllegalArgumentException("Error fetching service details for RID " + item.getRid() + ": " + ex.getMessage(), ex);
     }
 }

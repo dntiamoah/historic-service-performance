@@ -39,11 +39,12 @@ hsp:
   usr: ntiamoahd@btinternet.com
   pwd: skf@FVW@v7rkkGt
   theDate: 19680410
+  recordCount: 0
+  errorCount: 0
   schedule:
     minute: 0 */1 * * * *
     tenMin: 0 */10 * * * *
     daily: 0 1 1 * * *
     date: 20251221
-    skipped: 0
 
 

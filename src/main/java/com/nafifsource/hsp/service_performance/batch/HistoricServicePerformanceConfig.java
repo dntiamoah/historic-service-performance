@@ -28,6 +28,8 @@ public class HistoricServicePerformanceConfig {
     private String usr;
     private String pwd;
     private String theDate;
+    private Integer recordCount;
+    private Integer errorCount;
 
     @Bean("webClientRockShore")
     public WebClient webclient() {
